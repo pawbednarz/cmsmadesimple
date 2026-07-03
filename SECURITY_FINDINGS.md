@@ -263,3 +263,16 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** upload a file named `<img src=x onerror=alert(document.cookie)>.txt`
 - **Description:** Uploaded filenames retain HTML metacharacters and are embedded raw into the file-list row HTML (link text and image `alt`), so a maliciously named file stored by a low-privilege uploader executes script in the browser of any administrator who later browses that folder — a stored XSS that crosses from a file-upload user to full admins.
+
+---
+
+## 21. Path Traversal — arbitrary directory delete / chmod via ModuleManager `mod`
+- **Name:** Path Traversal → Arbitrary File Deletion / Permission Change (CWE-22 / CWE-73)
+- **File:** `modules/ModuleManager/action.local_remove.php:9-12` (`$module = params['mod']` → `cms_join_path(root_path,'modules',$module)` → `recursive_delete($dir)`, no `..` check); same pattern in `action.local_chmod.php:9-12` (`chmod_r($dir,0777)`).
+- **URL:**
+  ```
+  delete:  POST https://TARGET/admin/moduleinterface.php?mact=ModuleManager,m1_,local_remove,0&__c=KEY&m1_mod=../uploads
+  chmod:   POST https://TARGET/admin/moduleinterface.php?mact=ModuleManager,m1_,local_chmod,0&__c=KEY&m1_mod=../..
+  ```
+- **Payload:** `m1_mod=../uploads` (wipe uploads) · `m1_mod=..` (recursively delete the whole webroot) · `m1_mod=../..` to `chmod -R 0777`
+- **Description:** The `mod` parameter is meant to be a module directory name but is concatenated into a path and recursively deleted / chmod-0777'd with no traversal check, so it escapes `modules/` to destroy or world-writable any directory the web user can reach — site-wide destruction (DoS) or a permissions-weakening step. Requires "Modify Modules"; the operations exceed that permission's intended scope (the module directory only).
