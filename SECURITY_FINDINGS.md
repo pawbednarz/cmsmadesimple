@@ -115,3 +115,16 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `user_id=1` (the super-admin, group 1) + a new `password`/`passwordagain`
 - **Description:** A user holding only "Manage Users" (meant to be delegatable to non-super-admins) can edit any account including a group-1 super-admin and reset its password → full account takeover. The `$access_group` guard that should block editing super-admins is computed but never checked. `deleteuser.php` likewise lets a Manage-Users operator delete super-admin accounts (only self-delete and page-ownership are blocked).
+
+---
+
+## 10. Tar-Slip — arbitrary file write via archive extraction
+- **Name:** Path Traversal / Arbitrary File Write on Extraction (CWE-22 / CWE-434)
+- **File:** `modules/FileManager/easyarchives/EasyTar.class.php:60-78` (entry `name` concatenated to `$dest` with no `../` sanitization); reached via `modules/FileManager/action.unpack.php:34` → `EasyArchive::extract` (tar/gz/bz2 path; zip uses safe `ZipArchive::extractTo`)
+- **URL:**
+  ```
+  1) upload evil.tar via  POST .../moduleinterface.php?mact=FileManager,m1_,upload,0&__c=KEY
+  2) POST https://TARGET/admin/moduleinterface.php?mact=FileManager,m1_,unpack,0&__c=KEY  (select evil.tar)
+  ```
+- **Payload:** a `.tar`/`.tar.gz` whose entry name is `../../shell.php` with PHP contents (climb out of uploads into webroot)
+- **Description:** The custom tar extractor writes each entry to `$dest.$name` without confining to the destination, so a traversal entry name writes anywhere the web user can. Bypasses the upload extension filter (the archive itself is benign) → webshell → RCE. Authenticated (Modify Files).
