@@ -192,3 +192,16 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `bookmark_id` belonging to another user
 - **Description:** Any admin can delete another user's bookmark by ID, or via `editbookmark` overwrite another user's bookmark and reassign it to themselves — neither verifies the bookmark belongs to the current user. Low impact (per-user bookmarks).
+
+---
+
+## 16. Mass Assignment → Privilege Escalation in content editing (page ownership/editors)
+- **Name:** Mass Assignment / Broken Access Control (CWE-915 / CWE-639)
+- **File:** `lib/classes/class.ContentBase.php:1833-1845` (`FillParams` applies `ownerid` → `SetOwner` and `additional_editors` → `SetAdditionalEditors` with no permission check); invoked unconditionally at `modules/CMSContentManager/action.admin_editcontent.php:184` for anyone passing `CanEditContent()` (which includes non-owner **additional editors** via `author_pages`, `CMSContentManager.module.php:59-68`)
+- **URL:**
+  ```
+  POST https://TARGET/admin/moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY
+  m1_content_id=<page_you_can_edit>&ownerid=<your_uid>&additional_editors[]=<your_uid>&m1_submit=1
+  ```
+- **Payload:** raw (unprefixed) `ownerid=<uid>` and `additional_editors[]=<uid>` added to the POST (`FillParams` reads them straight from `$_POST`)
+- **Description:** A user who can edit a page only as an *additional editor* (the lowest content privilege, and not "Manage All Content"/"Modify Any Page") can POST `ownerid` to make themselves the page **owner**, and rewrite the `additional_editors` list. The UI hides these controls for non-owners (`action.admin_editcontent.php:292`) but the server applies them anyway. Result: additional-editor → page owner takeover (unlocks owner-only actions, e.g. content-type change and delete-via-authorship), plus arbitrary reassignment of page ownership. `active`/`secure`/`page_url` are similarly settable without a per-field check.
