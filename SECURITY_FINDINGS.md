@@ -89,3 +89,29 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `cms_cron=1`
 - **Description:** Async job-queue processing can be triggered by anyone with no login or shared secret (self-throttled by a timestamp, so not raw DoS).
+
+---
+
+## 8. Unrestricted File Upload — FileManager (inconsistent validation)
+- **Name:** Unrestricted Upload of File with Dangerous Type (CWE-434)
+- **File:** `modules/FileManager/action.upload.php:23-31` (`is_file_acceptable` blocks only extensions that `startswith('php')`/`endswith('php')`); base handler `lib/class.jquery_upload_handler.php:27` uses `accept_file_types => /.+$/i`. Does not use FilePicker's allowlist (`FilePicker::is_acceptable_filename`).
+- **URL:**
+  ```
+  POST https://TARGET/admin/moduleinterface.php?mact=FileManager,m1_,upload,0&__c=KEY
+  (multipart/form-data with m1_files[] = shell.phtml)
+  ```
+- **Payload:** upload `shell.phtml` / `shell.pht` / `shell.phar`, or an `.htaccess` that maps a benign extension to the PHP handler, then the payload
+- **Description:** FileManager's upload gate is a blocklist that misses `.phtml`, `.pht`, `.phar`, and `.htaccess`; it ignores the strict per-profile allowlist FilePicker implements. `uploads/` has no execution restriction, so on Apache configs that map those extensions this yields RCE. Authenticated (Modify Files); blocklist also skipped entirely when `developer_mode` is on.
+
+---
+
+## 9. Privilege Escalation — user management ignores super-admin protection
+- **Name:** Broken Access Control / Privilege Escalation (CWE-269 / CWE-639)
+- **File:** `admin/edituser.php:61-62` (`$access_group` computed but never enforced in the save path at `:76-141`); `admin/deleteuser.php:34-62` (no group-1 check)
+- **URL:**
+  ```
+  POST https://TARGET/admin/edituser.php?__c=KEY
+  user_id=1&user=admin&password=Pwned123!&passwordagain=Pwned123!&email=&submit=1
+  ```
+- **Payload:** `user_id=1` (the super-admin, group 1) + a new `password`/`passwordagain`
+- **Description:** A user holding only "Manage Users" (meant to be delegatable to non-super-admins) can edit any account including a group-1 super-admin and reset its password → full account takeover. The `$access_group` guard that should block editing super-admins is computed but never checked. `deleteuser.php` likewise lets a Manage-Users operator delete super-admin accounts (only self-delete and page-ownership are blocked).
