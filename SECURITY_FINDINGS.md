@@ -233,3 +233,17 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** image = `x" onerror="alert(document.cookie)` → renders `<img src="x" onerror="alert(document.cookie)"/>`; or extra1 = `<script>alert(document.cookie)</script>`
 - **Description:** Unlike name/menutext/titleattribute (which at least get `strip_tags`), the `image`, `thumbnail`, and `extra1-3` content properties are stored completely raw. `{page_image tag=1}` inlines the `image` value into `src="..."` unescaped → an `onerror` payload gives a **zero-click** stored XSS on the public frontend for every visitor; `{page_attr key='extra1'}` emits `extra*` raw so `<script>` works directly. Settable by any content editor (including a non-owner additional editor) on any page they can edit.
+
+---
+
+## 19. Stored XSS — "Link" content-type URL (javascript: URI / attribute breakout)
+- **Name:** Stored Cross-Site Scripting (CWE-79 / CWE-83)
+- **File:** `lib/classes/contenttypes/Link.inc.php:57-63` (`url` property set from `$params['url']`/`file_url` with no filter) and `:113-116` (`GetURL()` returns the value raw — the `cms_htmlentities` line is commented out); rendered unescaped as `href="{$node->url}"` in the shipped nav templates (e.g. `modules/Navigator/templates/cssmenu.tpl:59`, `simple_navigation.tpl:52`, `minimal_menu.tpl:40`).
+- **URL:**
+  ```
+  create a "Link" page: POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY
+                        m1_content_type=link&title=Evil&url=javascript:alert(document.cookie)&m1_submit=1
+  fire (any visitor):   click the menu entry (javascript:) — or use url=`x" onmouseover="alert(1)` for attribute breakout
+  ```
+- **Payload:** `url=javascript:alert(document.cookie)` or `url=x" onmouseover="alert(1)`
+- **Description:** The Link content type stores its target URL with no sanitization and `GetURL()` deliberately returns it unescaped (encoding commented out). Navigation menus render it directly into an `href`, so a content editor with "Add Pages" can plant a menu link that runs script when clicked (`javascript:` URI) or on hover (attribute breakout) — stored XSS on the public frontend.

