@@ -205,3 +205,17 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** raw (unprefixed) `ownerid=<uid>` and `additional_editors[]=<uid>` added to the POST (`FillParams` reads them straight from `$_POST`)
 - **Description:** A user who can edit a page only as an *additional editor* (the lowest content privilege, and not "Manage All Content"/"Modify Any Page") can POST `ownerid` to make themselves the page **owner**, and rewrite the `additional_editors` list. The UI hides these controls for non-owners (`action.admin_editcontent.php:292`) but the server applies them anyway. Result: additional-editor → page owner takeover (unlocks owner-only actions, e.g. content-type change and delete-via-authorship), plus arbitrary reassignment of page ownership. `active`/`secure`/`page_url` are similarly settable without a per-field check.
+
+---
+
+## 17. Stored XSS — page menu text breaks out of breadcrumb title attribute (frontend)
+- **Name:** Stored Cross-Site Scripting (CWE-79)
+- **File:** input filter only `strip_tags` at `lib/classes/class.ContentBase.php` FillParams (`mMenuText = strip_tags(trim($params['menutext']))`); output unescaped in an HTML attribute at `modules/Navigator/templates/dflt_breadcrumbs.tpl:17` (`title="{$node->menutext}"`). Core `{menu_text}` plugin also outputs raw (`lib/plugins/function.menu_text.php`).
+- **URL:**
+  ```
+  set (content editor): POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY
+                        m1_content_id=<page>&menutext=" onmouseover="alert(document.cookie)&m1_submit=1
+  fire (any visitor):   browse any frontend page that renders breadcrumbs
+  ```
+- **Payload:** menu text = `" onmouseover="alert(document.cookie)`
+- **Description:** `strip_tags` removes tags but leaves `"` and event-handler text, so menu text set by any content editor (including a non-owner additional editor) breaks out of the breadcrumb link's `title="..."` attribute, injecting an `onmouseover` handler that executes for any site visitor who hovers the breadcrumb — a stored XSS seeded from the admin side and fired on the public frontend. The output-encoding asymmetry (`{title}` HTML-encodes, `{menu_text}` does not) is the root cause; attribute-context templates make it exploitable despite the input filter.
