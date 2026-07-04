@@ -167,6 +167,7 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `cmd=mkdir&val=foo/../../evil` (traversal), or `cmd=del&val=<file>`, or `cmd=upload`
 - **Description:** The action performs no permission check, so any authenticated admin — even one without "Modify Files" — can create/delete/upload files via the always-permissive default profile. The `mkdir` value is not `basename()`-restricted (unlike `del`), so a mid-path `../` creates directories outside the sandbox.
+- **Impact upgrade → RCE:** the `upload` path validates via the default profile (`type=TYPE_ANY`), whose acceptance check (`FilePicker.module.php:234-240`) blocks only extensions that `startswith/endswith 'php'` — identical to finding #8. So **any authenticated admin with no file permission at all** can upload `shell.phtml`/`.pht`/`.phar`/`.htaccess` through `ajax_cmd` and reach it under `uploads/` → remote code execution (a lower-privilege path to #8's RCE).
 
 ---
 
@@ -276,3 +277,16 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
   ```
 - **Payload:** `m1_mod=../uploads` (wipe uploads) · `m1_mod=..` (recursively delete the whole webroot) · `m1_mod=../..` to `chmod -R 0777`
 - **Description:** The `mod` parameter is meant to be a module directory name but is concatenated into a path and recursively deleted / chmod-0777'd with no traversal check, so it escapes `modules/` to destroy or world-writable any directory the web user can reach — site-wide destruction (DoS) or a permissions-weakening step. Requires "Modify Modules"; the operations exceed that permission's intended scope (the module directory only).
+
+---
+
+## 22. Path Traversal → arbitrary file write (RCE) via DesignManager design import
+- **Name:** Path Traversal / Arbitrary File Write on Import (CWE-22)
+- **File:** `modules/DesignManager/lib/class.dm_design_reader.php:214` (`value` taken verbatim from the imported XML) → `:400-401` (`file_put_contents(cms_join_path(uploads_path,'designs',$destdir,$rec['value']), base64_decode($rec['data']))`, no `basename`/`..` check). Note: template/CSS entries get renamed (`:303-343`) but the `__URL,,` asset-file loop does not.
+- **URL:**
+  ```
+  POST https://TARGET/admin/moduleinterface.php?mact=DesignManager,m1_,admin_import_design,0&__c=KEY
+  (step 1: upload a crafted design/theme XML;  steps 2-3: confirm import)
+  ```
+- **Payload:** a design XML whose a `__URL,,` file entry has `<value>../../../shell.php</value>` and base64 PHP in `<data>`
+- **Description:** The design/theme importer writes asset files to disk using a filename taken straight from the uploaded XML with no traversal sanitization, so a crafted import writes a PHP file anywhere under the web user's reach → RCE. Requires "Manage Designs" (design/template editors are high-trust, but this is a direct file-write primitive independent of the Smarty-template path, and escapes the intended `uploads/designs/` destination).
