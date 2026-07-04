@@ -2,7 +2,11 @@
 
 `TARGET` = host. `KEY` = the logged-in admin's `__c` token (copy it from any admin URL). Frontend params are prefixed `cntnt01`, admin params `m1_`.
 
-> **Input note:** `lib/include.php:74-90` globally sanitizes **`$_GET`** and `$_SERVER` only (strips `<...>` tags, encodes `'`/`"`). It does **not** touch `$_POST` or `$_REQUEST` — and module `$params` come from `$_REQUEST` via `GetModuleParameters`, so `mact` module params stay raw even on GET. Findings that read a payload straight from `$_GET` (retracted #3/#4, and #2's title) cannot carry tags/quotes; everything driven by POST body or `mact` params is unaffected.
+> **Input note (verified):**
+> - `lib/include.php:74-90` sanitizes **`$_GET` and `$_SERVER` only** (strips `<...>`, encodes `'`/`"`). **`$_POST` and `$_REQUEST` are NOT sanitized** anywhere.
+> - Admin actions via `moduleinterface.php` (returnid `''`) do **not** run `_cleanParamHash`, so their `mact` `$params` (from `$_REQUEST`) and any direct `$_POST` reads are raw. → all admin POST/mact findings valid.
+> - Frontend actions (returnid set) **do** run `_cleanParamHash`, which `cms_htmlentities()`-encodes unmapped params — but News #1 (`fesubmit.php:82`) and Search #14 (`dosearch.php:78`) call `cms_html_entity_decode()` on the value, undoing it → those stay exploitable.
+> - Only payloads read **straight from `$_GET`** are neutralized: retracted #3/#4 and #2's `title`.
 
 ---
 
