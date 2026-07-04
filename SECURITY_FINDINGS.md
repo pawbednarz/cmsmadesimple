@@ -17,7 +17,10 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
 
 ---
 
-## 2. Stored/Self XSS + Open Redirect — Bookmarks
+## 2. Open Redirect — Bookmarks  (⚠️ stored-XSS part RETRACTED)
+> **Correction:** `title` is read from `$_GET['title']`, which the bootstrap sanitizer (`lib/include.php:74-90`) strips tags from and quote-encodes, so the **stored-XSS is NOT exploitable**. The **open redirect via `ref` remains valid** (base64, no tags/quotes to strip). Original entry below.
+
+## 2. (stored-XSS invalid; open redirect valid) Bookmarks
 - **Name:** Stored XSS (CWE-79) + Open Redirect (CWE-601)
 - **File:** `admin/makebookmark.php:35,40` (raw `$_GET['title']` stored; `$_GET['ref']` base64→`Location:`); `admin/listbookmarks.php:76-77` echoes raw
 - **URL (store):**
@@ -30,7 +33,10 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
 
 ---
 
-## 3. Reflected XSS — MicroTiny file picker
+## 3. Reflected XSS — MicroTiny file picker  — ❌ RETRACTED (invalid)
+> **Not exploitable.** `field`/`subdir` are read from `$_GET`, which `lib/include.php:74-90` globally sanitizes at bootstrap (`preg_replace('/\x00|<[^>]*>?/','')` strips tags; `'`/`"` → `&#39;`/`&#34;`). The JS-string breakout and HTML injection can't fire. Left here for the record.
+
+## 3. (original, invalid) Reflected XSS — MicroTiny file picker
 - **Name:** Reflected Cross-Site Scripting (CWE-79)
 - **File:** `modules/MicroTiny/action.filepicker.php` (raw `$_GET['field']`, `$_GET['subdir']`); `templates/filepicker.tpl:111` (`field_id:'{$field}'`, JS context) and `:36` (`{$startpath}`, HTML context)
 - **URL:**
@@ -42,7 +48,10 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
 
 ---
 
-## 4. Reflected XSS — Event Manager
+## 4. Reflected XSS — Event Manager  — ❌ RETRACTED (invalid)
+> **Not exploitable.** `event`/`module` are read from `$_GET`, globally sanitized at bootstrap (`lib/include.php:74-90`): `<...>` tags are stripped and quotes encoded, so the payload renders as inert text. Confirmed by testing. Left here for the record.
+
+## 4. (original, invalid) Reflected XSS — Event Manager
 - **Name:** Reflected Cross-Site Scripting (CWE-79)
 - **File:** `admin/eventhandlers.php:74-75` (raw `$_GET['event']`/`$_GET['module']` echoed; also into `href`s)
 - **URL:**

