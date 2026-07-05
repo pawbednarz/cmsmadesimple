@@ -218,7 +218,10 @@ Frontend module params are prefixed `cntnt01`; admin module params are prefixed 
 
 ---
 
-## 17. Stored XSS — page menu text breaks out of breadcrumb title attribute (frontend)
+## 17. Stored XSS — menu text in breadcrumb  — ❌ RETRACTED (invalid)
+> **Not exploitable.** Traced source→sink: the breadcrumb/menu templates use `{$node->menutext}`, and `Navigator/lib/class.Nav_utils.php:90` sets `menutext = cms_htmlentities($content->MenuText())` — i.e. the value is HTML-encoded before the template, so the `"`-breakout can't fire. (A separate `raw_menutext` exists but no shipped template uses it.) The core `{menu_text}` plugin does emit raw, but only in text context in shipped templates, where the input `strip_tags` already removed tags. Retracted.
+
+## 17. (original, invalid) Stored XSS — page menu text breaks out of breadcrumb title attribute (frontend)
 - **Name:** Stored Cross-Site Scripting (CWE-79)
 - **File:** input filter only `strip_tags` at `lib/classes/class.ContentBase.php` FillParams (`mMenuText = strip_tags(trim($params['menutext']))`); output unescaped in an HTML attribute at `modules/Navigator/templates/dflt_breadcrumbs.tpl:17` (`title="{$node->menutext}"`). Core `{menu_text}` plugin also outputs raw (`lib/plugins/function.menu_text.php`).
 - **URL:**

